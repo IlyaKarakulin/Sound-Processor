@@ -3,15 +3,20 @@
 #include <string>
 #include <cstdint>
 #include <stdexcept>
+#include <algorithm>
+#include <queue>
+#include <utility>
+#include <filesystem>
 
 using namespace std;
+namespace fs = std::filesystem;
 
 class MetaData
 {
 public:
-    virtual bool openWAVFile(string) = 0;
     MetaData() = default;
     virtual ~MetaData() = default;
+    virtual bool openWAVFile(string) = 0;
 
 protected:
     // WAV file header structure
@@ -73,54 +78,102 @@ class Converter
 {
 private:
 public:
-    Converter();
+    Converter() = default;
     virtual ~Converter() = default;
-    virtual void convert() = 0;
+    virtual void convert(string) = 0;
 };
 
 class Mute : public Converter
 {
+private:
+    u_int32_t left;
+    u_int32_t right;
+
 public:
-    Mute();
-    void convert() override;
+    Mute(u_int32_t, u_int32_t);
+    ~Mute() = default;
+    void convert(string) override;
 };
 
 class Mix : public Converter
 {
+private:
+    string nameSrcFile;
+    u_int32_t start_with;
+
 public:
-    Mix();
-    void convert() override;
+    Mix(string, u_int32_t);
+    ~Mix() = default;
+    void convert(string) override;
 };
 
-class Pass : public Converter
+class Reverberation : public Converter
 {
+private:
+    u_int32_t left;
+    u_int32_t right;
+    double koeff;
+
 public:
-    Pass();
-    void convert() override;
+    Reverberation(u_int32_t, u_int32_t, double);
+    ~Reverberation() = default;
+    void convert(string) override;
 };
 
 class Creater
 {
 public:
-    Creater();
+    Creater() = default;
     virtual ~Creater() = default;
-    virtual Converter *creatConverter() = 0;
+    // virtual Converter *creatConverter() = 0;
 };
 
 class MuteCreater : public Creater
 {
+private:
 public:
-    Converter *creatConverter() override;
+    MuteCreater() = default;
+    Converter *creatConverter(u_int32_t, u_int32_t);
 };
 
 class MixCreater : public Creater
 {
+private:
 public:
-    Converter *creatConverter() override;
+    MixCreater() = default;
+    Converter *creatConverter(u_int32_t, string);
 };
 
-class PassCreater : public Creater
+class ReverberationCreater : public Creater
 {
+private:
 public:
-    Converter *creatConverter() override;
+    ReverberationCreater() = default;
+    Converter *creatConverter(u_int32_t, u_int32_t, double);
+};
+
+class ParseCmdLineArg
+{
+private:
+    vector<string> args;
+    string confFileName;
+
+public:
+    ParseCmdLineArg(int, char **);
+    ~ParseCmdLineArg() = default;
+    string getConfFileName();
+    string getInWAVFileName(int);
+    string getOutWAVFileName();
+    string getMainWAVFileName();
+};
+
+class ParseConfigFile
+{
+private:
+    string confFileName;
+
+public:
+    ParseConfigFile(string);
+    ~ParseConfigFile() = default;
+    queue<Converter *> parsing(ParseCmdLineArg &parseArgs);
 };

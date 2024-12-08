@@ -92,28 +92,191 @@ void WriteWAV::saveSamples(vector<int16_t> &samples)
     file.write((const char *)(samples.data()), samples.size() * sizeof(int16_t));
 }
 
-int main()
+ParseCmdLineArg::ParseCmdLineArg(int argv, char **argc)
 {
-    ReadWAV reader;
-    reader.openWAVFile("./exp_music/el_guitar_16.wav");
-    reader.parseHead();
+    size_t index = 0;
+    this->args.assign(argc, argc + argv);
 
-    cout << reader.checkCorrect()
-         << endl;
+    auto it = find(this->args.begin(), this->args.end(), "-c");
 
-    vector<int16_t> samples;
-    samples.reserve(reader.getUnitSize());
-
-    WriteWAV writer;
-    writer.openWAVFile("./el_guitar_16_out.wav");
-    writer.writeHead();
-
-    while (reader.getSamples(samples))
+    if ((it != this->args.end()) && (++it != this->args.end()))
     {
-        writer.saveSamples(samples);
+        this->confFileName = *it;
+        if (!(this->confFileName.ends_with(".txt") && this->confFileName.length() > 4))
+            throw runtime_error("Invalid file format!\n");
+    }
+    else
+    {
+        throw runtime_error("The configuration file was not found!\n");
+    }
+}
+
+string ParseCmdLineArg::getConfFileName()
+{
+    return this->confFileName;
+}
+
+string ParseCmdLineArg::getMainWAVFileName()
+{
+    return this->args.at(4);
+}
+
+string ParseCmdLineArg::getInWAVFileName(int n)
+{
+    return this->args.at(4 + n);
+}
+
+string ParseCmdLineArg::getOutWAVFileName()
+{
+    return this->args.at(3);
+}
+
+Mute::Mute(u_int32_t left, u_int32_t right)
+{
+    this->left = left;
+    this->right = right;
+}
+
+void Mute::convert(string fileName)
+{
+    cout << "mute " << this->left << " " << this->right << endl;
+}
+
+Mix::Mix(string nameSrcFile, u_int32_t start_with)
+{
+    this->nameSrcFile = nameSrcFile;
+    this->start_with = start_with;
+}
+
+void Mix::convert(string fileName)
+{
+    cout << "mix " << this->start_with << " " << this->nameSrcFile << endl;
+}
+
+Reverberation::Reverberation(u_int32_t left, u_int32_t right, double koeff)
+{
+    this->left = left;
+    this->right = right;
+    this->koeff = koeff;
+}
+
+void Reverberation::convert(string fileName)
+{
+    cout << "revb " << this->left << " " << this->right << " " << this->koeff << endl;
+}
+
+Converter *MuteCreater::creatConverter(u_int32_t left, u_int32_t rigth)
+{
+    Mute *mute = new Mute(left, rigth);
+    return mute;
+}
+
+Converter *MixCreater::creatConverter(u_int32_t start, string nameSrcFile)
+{
+    Mix *mix = new Mix(nameSrcFile, start);
+    return mix;
+}
+
+Converter *ReverberationCreater::creatConverter(u_int32_t left, u_int32_t rigth, double koeff)
+{
+    Reverberation *reverberation = new Reverberation(left, rigth, koeff);
+    return reverberation;
+}
+
+ParseConfigFile::ParseConfigFile(string name)
+{
+    this->confFileName = name;
+}
+
+queue<Converter *> ParseConfigFile::parsing(ParseCmdLineArg &parseArgs)
+{
+    ifstream fin(this->confFileName);
+    queue<Converter *> conv_queue;
+    string str;
+    string tmp;
+    char pass = 0;
+    u_int32_t left = 0, rigth = 0;
+
+    MuteCreater muteCreater;
+    MixCreater mixCreater;
+    ReverberationCreater revbCreater;
+
+    while (fin >> str)
+    {
+        if (str == "mute")
+        {
+            fin >> left >> rigth;
+
+            Mute *mute = (Mute *)muteCreater.creatConverter(left, rigth);
+            conv_queue.push(mute);
+        }
+        else if (str == "mix")
+        {
+            int with = 0;
+            fin >> tmp >> with;
+            int num_file = 0;
+            num_file = stoi(tmp.substr(1));
+
+            Mix *mix = (Mix *)mixCreater.creatConverter(with, parseArgs.getInWAVFileName(num_file));
+            conv_queue.push(mix);
+        }
+        else if (str == "reverberation")
+        {
+            double k = 0.0;
+            fin >> left >> rigth >> k;
+
+            Reverberation *revb = (Reverberation *)revbCreater.creatConverter(left, rigth, k);
+            conv_queue.push(revb);
+        }
+        else
+        {
+            cerr << "Comand was not found!\n";
+        }
     }
 
-    writer.closeWAVFile();
-    reader.closeWAVFile();
+    return conv_queue;
+}
+
+int main(int argc, char **argv)
+{
+    // ReadWAV reader;
+    // reader.openWAVFile("./exp_music/el_guitar_16.wav");
+    // reader.parseHead();
+
+    // cout << reader.checkCorrect()
+    //      << endl;
+
+    // vector<int16_t> samples;
+    // samples.reserve(reader.getUnitSize());
+
+    // WriteWAV writer;
+    // writer.openWAVFile("./el_guitar_16_out.wav");
+    // writer.writeHead();
+
+    // while (reader.getSamples(samples))
+    // {
+    //     writer.saveSamples(samples);
+    // }
+
+    // writer.closeWAVFile();
+    // reader.closeWAVFile();
+
+    ParseCmdLineArg parserCmdLine(argc, argv);
+    string confFileName = parserCmdLine.getConfFileName();
+
+    ParseConfigFile parserConfFile(confFileName);
+    queue<Converter *> convs = parserConfFile.parsing(parserCmdLine);
+
+    string mainFileName = parserCmdLine.getMainWAVFileName();
+    string outFileName = parserCmdLine.getOutWAVFileName();
+    fs::copy(mainFileName, outFileName, fs::copy_options::overwrite_existing);
+
+    while (!convs.empty())
+    {
+        Converter *conv = convs.front();
+        convs.pop();
+        conv->convert(outFileName);
+    }
+
     return 0;
 }

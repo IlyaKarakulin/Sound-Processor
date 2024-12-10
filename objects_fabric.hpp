@@ -44,8 +44,8 @@ class ReadWAV : public MetaData
 private:
     ifstream file;
     string inputFileName;
-    const int sizeOfUnit = 524288; // cout samples
-    int remainingDataSize;
+    const int sizeOfUnit = 44100; // 524288; // cout samples
+    u_int64_t remainingDataSize;
 
 public:
     ReadWAV() = default;
@@ -53,10 +53,11 @@ public:
     bool checkCorrect();
     void parseHead();
     // reads a certain amount of data and returns true if not the entire file has been read, and false otherwise
-    bool getSamples(vector<int16_t> &);
+    bool getSamples(vector<int16_t> &, int, int);
     bool openWAVFile(string) override;
     bool closeWAVFile();
     int getUnitSize();
+    uint32_t getSampleRate();
 };
 
 class WriteWAV : public MetaData
@@ -71,7 +72,7 @@ public:
     bool openWAVFile(string) override;
     bool closeWAVFile();
     void writeHead();
-    void saveSamples(vector<int16_t> &);
+    void saveSamples(vector<int16_t> &, int);
 };
 
 class Converter
@@ -80,7 +81,7 @@ private:
 public:
     Converter() = default;
     virtual ~Converter() = default;
-    virtual void convert(string) = 0;
+    virtual void convert(string, string, ReadWAV &, WriteWAV &) = 0;
 };
 
 class Mute : public Converter
@@ -92,7 +93,7 @@ private:
 public:
     Mute(u_int32_t, u_int32_t);
     ~Mute() = default;
-    void convert(string) override;
+    void convert(string, string, ReadWAV &, WriteWAV &) override;
 };
 
 class Mix : public Converter
@@ -104,7 +105,7 @@ private:
 public:
     Mix(string, u_int32_t);
     ~Mix() = default;
-    void convert(string) override;
+    void convert(string, string, ReadWAV &, WriteWAV &) override;
 };
 
 class Reverberation : public Converter
@@ -117,7 +118,7 @@ private:
 public:
     Reverberation(u_int32_t, u_int32_t, double);
     ~Reverberation() = default;
-    void convert(string) override;
+    void convert(string, string, ReadWAV &, WriteWAV &) override;
 };
 
 class Creater

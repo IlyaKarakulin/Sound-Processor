@@ -32,7 +32,7 @@ void ReadWAV::parseHead()
     this->header = new WAVHeader;
 
     file.read((char *)this->header, sizeof(WAVHeader));
-    this->remainingDataSize = this->header->subchunk2Size / 2; // count remaining samples
+    //? this->remainingDataSize = this->header->subchunk2Size / 2; // count remaining samples
 }
 
 bool ReadWAV::checkCorrect()
@@ -48,11 +48,20 @@ bool ReadWAV::checkCorrect()
 }
 
 // reads a certain amount of data and returns true if not the entire file has been read, and false otherwise
-bool ReadWAV::getSamples(vector<int16_t> &samples)
+bool ReadWAV::getSamples(vector<int16_t> &samples, int sec_st, int sec_end)
 {
+    u_int64_t offset = (u_int64_t)header->sampleRate * (u_int64_t)sec_st - (u_int64_t)sizeof(header);
+    streampos currentPos = file.tellg();
+
+    if (currentPos < offset)
+    {
+        this->file.seekg(offset, ios::beg);
+        this->remainingDataSize = (u_int64_t)(sec_end - sec_st) * (u_int64_t)header->sampleRate;
+    }
+
     if (this->remainingDataSize > 0)
     {
-        size_t bytesToRead = min(this->getUnitSize(), this->remainingDataSize);
+        size_t bytesToRead = min((u_int64_t)this->getUnitSize(), this->remainingDataSize);
         samples.resize(bytesToRead);
         file.read((char *)samples.data(), bytesToRead * sizeof(int16_t));
         this->remainingDataSize -= bytesToRead;
@@ -64,11 +73,17 @@ bool ReadWAV::getSamples(vector<int16_t> &samples)
     }
 }
 
+uint32_t ReadWAV::getSampleRate()
+{
+    return this->header->sampleRate;
+}
+
 bool WriteWAV::openWAVFile(string outputFileName)
 {
     // Open the WAV file that check that the path is correct
     this->outputFileName = outputFileName;
-    this->file.open(this->outputFileName, ios::binary);
+    // this->file.open(this->outputFileName, ios::binary);
+    this->file.open(outputFileName, ios::in | ios::out | ios::binary);
 
     if (!this->file.is_open())
         throw runtime_error("Failed to open the file. Please check the file name or path.\n");
@@ -87,9 +102,15 @@ void WriteWAV::writeHead()
     file.write((const char *)(this->header), sizeof(WAVHeader));
 }
 
-void WriteWAV::saveSamples(vector<int16_t> &samples)
+void WriteWAV::saveSamples(vector<int16_t> &samples, int sec_st)
 {
-    file.write((const char *)(samples.data()), samples.size() * sizeof(int16_t));
+    u_int64_t offset = 2 * (u_int64_t)header->sampleRate * (u_int64_t)sec_st + (u_int64_t)sizeof(*header);
+    streampos currentPos = file.tellp();
+
+    if (currentPos < offset)
+        this->file.seekp(offset, ios::beg);
+
+    this->file.write((const char *)(samples.data()), samples.size() * sizeof(int16_t));
 }
 
 ParseCmdLineArg::ParseCmdLineArg(int argv, char **argc)
@@ -137,9 +158,26 @@ Mute::Mute(u_int32_t left, u_int32_t right)
     this->right = right;
 }
 
-void Mute::convert(string fileName)
+void Mute::convert(string inFileName, string OutFileName, ReadWAV &reader, WriteWAV &writer)
 {
     cout << "mute " << this->left << " " << this->right << endl;
+
+    if (fs::exists(OutFileName))
+        fs::remove(OutFileName);
+
+    fs::copy(inFileName, OutFileName, fs::copy_options::overwrite_existing);
+
+    writer.openWAVFile(OutFileName);
+    int countSec = this->right - this->left;
+    vector<int16_t> samples(reader.getUnitSize(), 0);
+
+    while (countSec)
+    {
+        writer.saveSamples(samples, left);
+        --countSec;
+    }
+
+    writer.closeWAVFile();
 }
 
 Mix::Mix(string nameSrcFile, u_int32_t start_with)
@@ -148,7 +186,7 @@ Mix::Mix(string nameSrcFile, u_int32_t start_with)
     this->start_with = start_with;
 }
 
-void Mix::convert(string fileName)
+void Mix::convert(string inFileName, string OutFileName, ReadWAV &reader, WriteWAV &writer)
 {
     cout << "mix " << this->start_with << " " << this->nameSrcFile << endl;
 }
@@ -160,7 +198,7 @@ Reverberation::Reverberation(u_int32_t left, u_int32_t right, double koeff)
     this->koeff = koeff;
 }
 
-void Reverberation::convert(string fileName)
+void Reverberation::convert(string inFileName, string OutFileName, ReadWAV &reader, WriteWAV &writer)
 {
     cout << "revb " << this->left << " " << this->right << " " << this->koeff << endl;
 }
@@ -239,7 +277,9 @@ queue<Converter *> ParseConfigFile::parsing(ParseCmdLineArg &parseArgs)
 
 int main(int argc, char **argv)
 {
-    // ReadWAV reader;
+    ReadWAV reader;
+    WriteWAV writer;
+
     // reader.openWAVFile("./exp_music/el_guitar_16.wav");
     // reader.parseHead();
 
@@ -249,11 +289,10 @@ int main(int argc, char **argv)
     // vector<int16_t> samples;
     // samples.reserve(reader.getUnitSize());
 
-    // WriteWAV writer;
     // writer.openWAVFile("./el_guitar_16_out.wav");
     // writer.writeHead();
 
-    // while (reader.getSamples(samples))
+    // while (reader.getSamples(samples, 2, 5))
     // {
     //     writer.saveSamples(samples);
     // }
@@ -267,16 +306,26 @@ int main(int argc, char **argv)
     ParseConfigFile parserConfFile(confFileName);
     queue<Converter *> convs = parserConfFile.parsing(parserCmdLine);
 
+    reader.openWAVFile(parserCmdLine.getMainWAVFileName());
+    reader.parseHead();
+    reader.closeWAVFile();
+
     string mainFileName = parserCmdLine.getMainWAVFileName();
     string outFileName = parserCmdLine.getOutWAVFileName();
-    fs::copy(mainFileName, outFileName, fs::copy_options::overwrite_existing);
+
+    fs::copy(mainFileName, "tmp1.wav", fs::copy_options::overwrite_existing);
+    pair<string, string> names{"tmp1.wav", "tmp2.wav"};
 
     while (!convs.empty())
     {
         Converter *conv = convs.front();
         convs.pop();
-        conv->convert(outFileName);
+        conv->convert(names.first, names.second, reader, writer);
+        swap(names.first, names.second);
     }
+
+    fs::remove(names.second);
+    rename(names.first.c_str(), parserCmdLine.getOutWAVFileName().c_str());
 
     return 0;
 }

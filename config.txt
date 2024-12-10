@@ -1,0 +1,3 @@
+mute 1 5
+mix $2 4
+reverberation 3 6 0.5

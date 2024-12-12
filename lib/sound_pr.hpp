@@ -84,6 +84,7 @@ public:
     Converter() = default;
     virtual ~Converter() = default;
     virtual void convert(string, string, ReadWAV &, WriteWAV &) = 0;
+    virtual void help() = 0;
 };
 
 class Mute : public Converter
@@ -96,6 +97,7 @@ public:
     Mute(u_int32_t, u_int32_t);
     ~Mute() = default;
     void convert(string, string, ReadWAV &, WriteWAV &) override;
+    void help() override;
 };
 
 class Mix : public Converter
@@ -109,6 +111,7 @@ public:
     Mix(string, u_int32_t);
     ~Mix() = default;
     void convert(string, string, ReadWAV &, WriteWAV &) override;
+    void help() override;
 };
 
 class Reverberation : public Converter
@@ -122,6 +125,7 @@ public:
     Reverberation(u_int32_t, u_int32_t, double);
     ~Reverberation() = default;
     void convert(string, string, ReadWAV &, WriteWAV &) override;
+    void help() override;
 };
 
 class Creater
@@ -161,6 +165,7 @@ class ParseCmdLineArg
 private:
     vector<string> args;
     string confFileName;
+    bool mode;
 
 public:
     ParseCmdLineArg(int, char **);
@@ -169,6 +174,7 @@ public:
     string getInWAVFileName(int);
     string getOutWAVFileName();
     string getMainWAVFileName();
+    bool getMode();
 };
 
 class ParseConfigFile
@@ -180,4 +186,14 @@ public:
     ParseConfigFile(string);
     ~ParseConfigFile() = default;
     queue<Converter *> parsing(ParseCmdLineArg &parseArgs);
+};
+
+class Main
+{
+public:
+    Main() = default;
+    ~Main() = default;
+    void soundProcessing(int, char **);
+    void helpPrint();
+    void processing(int, char **);
 };

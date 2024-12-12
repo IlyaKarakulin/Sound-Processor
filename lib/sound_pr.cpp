@@ -138,18 +138,34 @@ ParseCmdLineArg::ParseCmdLineArg(int argv, char **argc)
     size_t index = 0;
     this->args.assign(argc, argc + argv);
 
-    auto it = find(this->args.begin(), this->args.end(), "-c");
+    auto it = find(this->args.begin(), this->args.end(), "-h");
 
-    if ((it != this->args.end()) && (++it != this->args.end()))
+    if (it != this->args.end())
     {
-        this->confFileName = *it;
-        if (!(this->confFileName.ends_with(".txt") && this->confFileName.length() > 4))
-            throw runtime_error("Invalid file format!\n");
+        this->mode = 0;
     }
     else
     {
-        throw runtime_error("The configuration file was not found!\n");
+        it = find(this->args.begin(), this->args.end(), "-c");
+
+        if ((it != this->args.end()) && (++it != this->args.end()))
+        {
+            this->confFileName = *it;
+            if (!(this->confFileName.ends_with(".txt") && this->confFileName.length() > 4))
+                throw runtime_error("Invalid file format!\n");
+        }
+        else
+        {
+            throw runtime_error("The configuration file was not found!\n");
+        }
+
+        this->mode = 1;
     }
+}
+
+bool ParseCmdLineArg::getMode()
+{
+    return mode;
 }
 
 string ParseCmdLineArg::getConfFileName()
@@ -212,6 +228,14 @@ void Mute::convert(string inFileName, string OutFileName, ReadWAV &reader, Write
     writer.closeWAVFile();
 }
 
+void Mute::help()
+{
+    cout << "\033[33m   Mute converter\033[0m" << endl
+         << "Allows you to turn off the sound from <n> to <m> seconds" << endl
+         << "Example: mute 1 4" << endl
+         << endl;
+}
+
 // Constructor for the Mix class, initializes the source file and starting offset
 Mix::Mix(string nameSrcFile, u_int32_t start_with)
 {
@@ -236,7 +260,6 @@ void Mix::avg_samples(vector<int16_t> &samples, vector<int16_t> &scr_samples)
 
 void Mix::convert(string inFileName, string OutFileName, ReadWAV &reader, WriteWAV &writer)
 {
-    // Logs the mix operation details
     cout << "mix " << this->start_with << " " << this->nameSrcFile << endl;
 
     // Copies the input WAV file to the output path
@@ -278,6 +301,18 @@ void Mix::convert(string inFileName, string OutFileName, ReadWAV &reader, WriteW
     reader.closeWAVFile();
     src_reader.closeWAVFile();
     writer.closeWAVFile();
+}
+
+void Mix::help()
+{
+    cout << "\033[33m   Mix converter\033[0m" << endl
+         << "Mixes 2 audio streams by finding the arithmetic mean of a pair of samples" << endl
+         << "from the first and second streams, respectively" << endl
+         << "mix$<n> <s>" << endl
+         << "n is the sequence number of the file, from the command line parameters," << endl
+         << "which will be attached to the main file, s is the second from which to insert the file" << endl
+         << "Example: mix $1 4" << endl
+         << endl;
 }
 
 // Constructor for the Reverberation class, initializes the delay parameters
@@ -337,6 +372,17 @@ void Reverberation::convert(string inFileName, string outFileName, ReadWAV &read
     // Close all WAV files
     reader.closeWAVFile();
     writer.closeWAVFile();
+}
+
+void Reverberation::help()
+{
+    cout << "\033[33m   The reverb\033[0m" << endl
+         << "Adds an echo to the" << endl
+         << "reverberation sound stream <n> <m> <koeff>" << endl
+         << "n - m interval where the effect will be applied" << endl
+         << "coefficient of delay [0, 1]" << endl
+         << "example: reverberation 1 5 0.4" << endl
+         << endl;
 }
 
 // Factory method for creating Mute converters
@@ -416,4 +462,78 @@ queue<Converter *> ParseConfigFile::parsing(ParseCmdLineArg &parseArgs)
     }
 
     return conv_queue;
+}
+
+void Main::soundProcessing(int argc, char **argv)
+{
+
+    ReadWAV reader;
+    WriteWAV writer;
+    ParseCmdLineArg parserCmdLine(argc, argv);
+
+    string confFileName = parserCmdLine.getConfFileName();
+
+    ParseConfigFile parserConfFile(confFileName);
+    queue<Converter *> convs = parserConfFile.parsing(parserCmdLine);
+
+    reader.openWAVFile(parserCmdLine.getMainWAVFileName());
+    reader.parseHead();
+    reader.checkCorrect();
+    reader.closeWAVFile();
+
+    const string mainFileName = parserCmdLine.getMainWAVFileName();
+    const string outFileName = parserCmdLine.getOutWAVFileName();
+
+    fs::copy(mainFileName, "./tmp1.wav", fs::copy_options::overwrite_existing);
+    pair<string, string> names{"./tmp1.wav", "./tmp2.wav"};
+
+    if (fs::exists(outFileName))
+        fs::remove(outFileName);
+
+    while (!convs.empty())
+    {
+        Converter *conv = convs.front();
+        convs.pop();
+        conv->convert(names.first, names.second, reader, writer);
+        swap(names.first, names.second);
+    }
+
+    fs::remove(names.second);
+    rename(names.first.c_str(), outFileName.c_str());
+}
+
+void Main::helpPrint()
+{
+    MuteCreater muteCreater;
+    MixCreater mixCreater;
+    ReverberationCreater revbCreater;
+    queue<Converter *> convs;
+
+    Mute *mute = (Mute *)muteCreater.creatConverter(0, 1);
+    convs.push(mute);
+    Mix *mix = (Mix *)mixCreater.creatConverter(0, "tmp.wav");
+    convs.push(mix);
+    Reverberation *revb = (Reverberation *)revbCreater.creatConverter(0, 1, 0.5);
+    convs.push(revb);
+
+    while (!convs.empty())
+    {
+        Converter *conv = convs.front();
+        convs.pop();
+        conv->help();
+    }
+}
+
+void Main::processing(int argc, char **argv)
+{
+    ParseCmdLineArg parserCmdLine(argc, argv);
+
+    if (parserCmdLine.getMode())
+    {
+        this->soundProcessing(argc, argv);
+    }
+    else
+    {
+        this->helpPrint();
+    }
 }

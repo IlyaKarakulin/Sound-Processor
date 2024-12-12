@@ -8,7 +8,6 @@ add_subdirectory(lib)
 
 target_include_directories(sound_processor_lib PUBLIC .) # PRIVATE
 
-
 add_executable(sound_pr main.cpp)
 target_link_libraries(sound_pr PRIVATE sound_processor_lib)
 

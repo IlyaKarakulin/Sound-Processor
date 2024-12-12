@@ -1,20 +1,14 @@
 # **Audio Processor**
-*This is a simple learning project aimed at learning how to work with WAV files. The code is written in the OOP style with the "object factory" design template* \
+*This is a simple learning project aimed at learning how to work with WAV files.* \
 **Audio Processor** is a tool for processing WAV files, offering various audio effects such as **mute**, **mix**, and **reverberation**. This project showcases a flexible architecture using the **Factory Method** design pattern, allowing for easy addition of new audio effects. 
-
---
 
 ## **Features**
 - **Mute:** Removes audio signal within a specified time range.
 - **Mix:** Overlays one audio file onto another by averaging their amplitude values.
 - **Reverberation:** Adds echo effects with a customizable delay coefficient.
 
---
-
 ## **Requirements**
 - **Compiler:** C++20 or higher.
-
---
 
 ## **Installation and Execution**
 1. **Clone the repository:**

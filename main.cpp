@@ -2,8 +2,6 @@
 #include "objects_fabric.hpp"
 using namespace std;
 
-MetaData::WAVHeader *MetaData::header = nullptr;
-
 int ReadWAV::getUnitSize()
 {
     return this->sizeOfUnit;
@@ -78,6 +76,16 @@ uint32_t ReadWAV::getSampleRate()
     return this->header->sampleRate;
 }
 
+WAVHeader *ReadWAV::getHeader()
+{
+    return this->header;
+}
+
+int ReadWAV::getSizeFile()
+{
+    return header->subchunk2Size / (2 * header->sampleRate);
+}
+
 bool WriteWAV::openWAVFile(string outputFileName)
 {
     // Open the WAV file that check that the path is correct
@@ -97,14 +105,15 @@ bool WriteWAV::closeWAVFile()
     return !this->file.is_open();
 }
 
-void WriteWAV::writeHead()
+void WriteWAV::writeHead(ReadWAV &reader)
 {
-    file.write((const char *)(this->header), sizeof(WAVHeader));
+    file.write((const char *)(reader.getHeader()), sizeof(WAVHeader));
 }
 
-void WriteWAV::saveSamples(vector<int16_t> &samples, int sec_st)
+void WriteWAV::saveSamples(ReadWAV &reader, vector<int16_t> &samples, int sec_st)
 {
-    u_int64_t offset = 2 * (u_int64_t)header->sampleRate * (u_int64_t)sec_st + (u_int64_t)sizeof(*header);
+    u_int64_t offset = 2 * (u_int64_t)reader.getSampleRate() * (u_int64_t)sec_st + (u_int64_t)sizeof(WAVHeader);
+
     streampos currentPos = file.tellp();
 
     if (currentPos < offset)
@@ -162,9 +171,6 @@ void Mute::convert(string inFileName, string OutFileName, ReadWAV &reader, Write
 {
     cout << "mute " << this->left << " " << this->right << endl;
 
-    if (fs::exists(OutFileName))
-        fs::remove(OutFileName);
-
     fs::copy(inFileName, OutFileName, fs::copy_options::overwrite_existing);
 
     writer.openWAVFile(OutFileName);
@@ -173,7 +179,7 @@ void Mute::convert(string inFileName, string OutFileName, ReadWAV &reader, Write
 
     while (countSec)
     {
-        writer.saveSamples(samples, left);
+        writer.saveSamples(reader, samples, left);
         --countSec;
     }
 
@@ -189,6 +195,26 @@ Mix::Mix(string nameSrcFile, u_int32_t start_with)
 void Mix::convert(string inFileName, string OutFileName, ReadWAV &reader, WriteWAV &writer)
 {
     cout << "mix " << this->start_with << " " << this->nameSrcFile << endl;
+
+    fs::copy(inFileName, OutFileName, fs::copy_options::overwrite_existing);
+
+    reader.openWAVFile(inFileName);
+    reader.checkCorrect();
+
+    ReadWAV src_reader;
+    src_reader.openWAVFile(this->nameSrcFile);
+    src_reader.parseHead();
+    src_reader.checkCorrect();
+
+    int size = src_reader.getSizeFile();
+
+    cout << size << endl;
+
+    writer.openWAVFile(OutFileName);
+
+    reader.closeWAVFile();
+    src_reader.closeWAVFile();
+    writer.closeWAVFile();
 }
 
 Reverberation::Reverberation(u_int32_t left, u_int32_t right, double koeff)
@@ -313,8 +339,11 @@ int main(int argc, char **argv)
     string mainFileName = parserCmdLine.getMainWAVFileName();
     string outFileName = parserCmdLine.getOutWAVFileName();
 
-    fs::copy(mainFileName, "tmp1.wav", fs::copy_options::overwrite_existing);
-    pair<string, string> names{"tmp1.wav", "tmp2.wav"};
+    fs::copy(mainFileName, "./tmp1.wav", fs::copy_options::overwrite_existing);
+    pair<string, string> names{"./tmp1.wav", "./tmp2.wav"};
+
+    if (fs::exists(parserCmdLine.getOutWAVFileName()))
+        fs::remove(parserCmdLine.getOutWAVFileName());
 
     while (!convs.empty())
     {

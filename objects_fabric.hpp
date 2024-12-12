@@ -11,41 +11,40 @@
 using namespace std;
 namespace fs = std::filesystem;
 
+// WAV file header structure
+struct WAVHeader
+{
+    char chunkID[4];        // "RIFF"
+    uint32_t chunkSize;     // File size minus the first 8 bytes
+    char format[4];         // "WAVE"
+    char subchunk1ID[4];    // "fmt"
+    uint32_t subchunk1Size; // Size of the "fmt" subchunk (typically 16 for PCM)
+    uint16_t audioFormat;   //* Audio format code (1 = PCM)
+    uint16_t numChannels;   //* Number of audio channels (1 = mono, 2 = stereo, etc.)
+    uint32_t sampleRate;    //* Sampling rate in Hz (e.g., 44100 for CD-quality audio)
+    uint32_t byteRate;      // Bytes per second (sampleRate * numChannels * bitsPerSample / 8)
+    uint16_t blockAlign;    // Bytes per audio frame (numChannels * bitsPerSample / 8)
+    uint16_t bitsPerSample; //* Bits per sample (e.g., 8, 16, 24, or 32)
+    char subchunk2ID[4];    // "data" - Data subchunk identifier
+    uint32_t subchunk2Size; // Size of the audio data in bytes
+};
+
 class MetaData
 {
 public:
     MetaData() = default;
     virtual ~MetaData() = default;
     virtual bool openWAVFile(string) = 0;
-
-protected:
-    // WAV file header structure
-    struct WAVHeader
-    {
-        char chunkID[4];        // "RIFF"
-        uint32_t chunkSize;     // File size minus the first 8 bytes
-        char format[4];         // "WAVE"
-        char subchunk1ID[4];    // "fmt"
-        uint32_t subchunk1Size; // Size of the "fmt" subchunk (typically 16 for PCM)
-        uint16_t audioFormat;   //* Audio format code (1 = PCM)
-        uint16_t numChannels;   //* Number of audio channels (1 = mono, 2 = stereo, etc.)
-        uint32_t sampleRate;    //* Sampling rate in Hz (e.g., 44100 for CD-quality audio)
-        uint32_t byteRate;      // Bytes per second (sampleRate * numChannels * bitsPerSample / 8)
-        uint16_t blockAlign;    // Bytes per audio frame (numChannels * bitsPerSample / 8)
-        uint16_t bitsPerSample; //* Bits per sample (e.g., 8, 16, 24, or 32)
-        char subchunk2ID[4];    // "data" - Data subchunk identifier
-        uint32_t subchunk2Size; // Size of the audio data in bytes
-    };
-    static struct WAVHeader *header;
 };
 
-class ReadWAV : public MetaData
+class ReadWAV : public MetaData //!!! delit
 {
 private:
     ifstream file;
     string inputFileName;
     const int sizeOfUnit = 44100; // 524288; // cout samples
     u_int64_t remainingDataSize;
+    struct WAVHeader *header;
 
 public:
     ReadWAV() = default;
@@ -57,7 +56,9 @@ public:
     bool openWAVFile(string) override;
     bool closeWAVFile();
     int getUnitSize();
+    int getSizeFile();
     uint32_t getSampleRate();
+    WAVHeader *getHeader();
 };
 
 class WriteWAV : public MetaData
@@ -71,8 +72,8 @@ public:
     ~WriteWAV() = default;
     bool openWAVFile(string) override;
     bool closeWAVFile();
-    void writeHead();
-    void saveSamples(vector<int16_t> &, int);
+    void writeHead(ReadWAV &);
+    void saveSamples(ReadWAV &, vector<int16_t> &, int);
 };
 
 class Converter

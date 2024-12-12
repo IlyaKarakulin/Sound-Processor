@@ -9,6 +9,15 @@
 
 ## **Requirements**
 - **Compiler:** C++20 or higher.
+- **WAV files:** 
+    - Sample rate = 44100
+    - mono sound
+    - PCM 
+    - sound depth = 16 bit
+
+*To edit a WAV file, you can use the sox utility, for example, to view information about wav file use **soxi file.wav**, to convert to 16-bit sound depth, use **sox infile.wav -b 16 outfile.wav***
+
+
 
 ## **Installation and Execution**
 1. **Clone the repository:**
@@ -27,4 +36,6 @@ mix $1 3
 mix $2 7
 reverberation 5 10 0.5
 ```
-- ./output.wav
+- ./output.wav - the file where the result of the program will be saved
+- in.wav - the input file to be edited
+- in1.wav, in2.wav ... - the auxiliary files that the mix command will use, the main file will be merged with them

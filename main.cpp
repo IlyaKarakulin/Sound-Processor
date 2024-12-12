@@ -48,7 +48,7 @@ bool ReadWAV::checkCorrect()
 // reads a certain amount of data and returns true if not the entire file has been read, and false otherwise
 bool ReadWAV::getSamples(vector<int16_t> &samples, int sec_st, int sec_end)
 {
-    u_int64_t offset = (u_int64_t)header->sampleRate * (u_int64_t)sec_st - (u_int64_t)sizeof(header);
+    u_int64_t offset = 2 * (u_int64_t)header->sampleRate * (u_int64_t)sec_st + (u_int64_t)sizeof(header);
     streampos currentPos = file.tellg();
 
     if (currentPos < offset)
@@ -199,6 +199,7 @@ void Mix::convert(string inFileName, string OutFileName, ReadWAV &reader, WriteW
     fs::copy(inFileName, OutFileName, fs::copy_options::overwrite_existing);
 
     reader.openWAVFile(inFileName);
+    reader.parseHead();
     reader.checkCorrect();
 
     ReadWAV src_reader;
@@ -206,11 +207,25 @@ void Mix::convert(string inFileName, string OutFileName, ReadWAV &reader, WriteW
     src_reader.parseHead();
     src_reader.checkCorrect();
 
-    int size = src_reader.getSizeFile();
-
-    cout << size << endl;
-
     writer.openWAVFile(OutFileName);
+
+    const int src_size = src_reader.getSizeFile();
+    const int size = reader.getSizeFile();
+
+    vector<int16_t> src_samples;
+    src_samples.reserve(reader.getSampleRate());
+
+    vector<int16_t> samples;
+    samples.reserve(reader.getSampleRate());
+
+    bool flag = true;
+
+    while (src_reader.getSamples(src_samples, 0, src_size) && flag)
+    {
+        flag = reader.getSamples(samples, this->start_with, size);
+
+        writer.saveSamples(reader, samples, this->start_with);
+    }
 
     reader.closeWAVFile();
     src_reader.closeWAVFile();
@@ -334,16 +349,17 @@ int main(int argc, char **argv)
 
     reader.openWAVFile(parserCmdLine.getMainWAVFileName());
     reader.parseHead();
+    reader.checkCorrect();
     reader.closeWAVFile();
 
-    string mainFileName = parserCmdLine.getMainWAVFileName();
-    string outFileName = parserCmdLine.getOutWAVFileName();
+    const string mainFileName = parserCmdLine.getMainWAVFileName();
+    const string outFileName = parserCmdLine.getOutWAVFileName();
 
     fs::copy(mainFileName, "./tmp1.wav", fs::copy_options::overwrite_existing);
     pair<string, string> names{"./tmp1.wav", "./tmp2.wav"};
 
-    if (fs::exists(parserCmdLine.getOutWAVFileName()))
-        fs::remove(parserCmdLine.getOutWAVFileName());
+    if (fs::exists(outFileName))
+        fs::remove(outFileName);
 
     while (!convs.empty())
     {
@@ -354,7 +370,7 @@ int main(int argc, char **argv)
     }
 
     fs::remove(names.second);
-    rename(names.first.c_str(), parserCmdLine.getOutWAVFileName().c_str());
+    rename(names.first.c_str(), outFileName.c_str());
 
     return 0;
 }

@@ -48,10 +48,10 @@ bool ReadWAV::checkCorrect()
 // reads a certain amount of data and returns true if not the entire file has been read, and false otherwise
 bool ReadWAV::getSamples(vector<int16_t> &samples, int sec_st, int sec_end)
 {
-    u_int64_t offset = 2 * (u_int64_t)header->sampleRate * (u_int64_t)sec_st + (u_int64_t)sizeof(header);
+    u_int64_t offset = 2 * (u_int64_t)header->sampleRate * (u_int64_t)sec_st + (u_int64_t)sizeof(WAVHeader);
     streampos currentPos = file.tellg();
 
-    if (currentPos < offset)
+    if (currentPos <= offset)
     {
         this->file.seekg(offset, ios::beg);
         this->remainingDataSize = (u_int64_t)(sec_end - sec_st) * (u_int64_t)header->sampleRate;
@@ -192,6 +192,19 @@ Mix::Mix(string nameSrcFile, u_int32_t start_with)
     this->start_with = start_with;
 }
 
+void Mix::avg_samples(vector<int16_t> &samples, vector<int16_t> &scr_samples)
+{
+    auto it1 = samples.begin();
+    auto it2 = scr_samples.begin();
+
+    while (it1 != samples.end() && it2 != scr_samples.end())
+    {
+        *it1 = (*it1 + *it2) / 2;
+        ++it1;
+        ++it2;
+    }
+}
+
 void Mix::convert(string inFileName, string OutFileName, ReadWAV &reader, WriteWAV &writer)
 {
     cout << "mix " << this->start_with << " " << this->nameSrcFile << endl;
@@ -223,7 +236,7 @@ void Mix::convert(string inFileName, string OutFileName, ReadWAV &reader, WriteW
     while (src_reader.getSamples(src_samples, 0, src_size) && flag)
     {
         flag = reader.getSamples(samples, this->start_with, size);
-
+        this->avg_samples(samples, src_samples);
         writer.saveSamples(reader, samples, this->start_with);
     }
 
@@ -239,9 +252,48 @@ Reverberation::Reverberation(u_int32_t left, u_int32_t right, double koeff)
     this->koeff = koeff;
 }
 
-void Reverberation::convert(string inFileName, string OutFileName, ReadWAV &reader, WriteWAV &writer)
+void Reverberation::convert(string inFileName, string outFileName, ReadWAV &reader, WriteWAV &writer)
 {
-    cout << "revb " << this->left << " " << this->right << " " << this->koeff << endl;
+    cout << "revb: " << this->left << " " << this->right << " " << this->koeff << endl;
+
+    // Копируем исходный файл во временный для сохранения результата
+    fs::copy(inFileName, outFileName, fs::copy_options::overwrite_existing);
+
+    reader.openWAVFile(inFileName);
+    reader.parseHead();
+    reader.checkCorrect();
+
+    writer.openWAVFile(outFileName);
+
+    vector<int16_t> samples;
+    vector<int16_t> delayedSamples;
+
+    const uint32_t sampleRate = reader.getSampleRate();
+    const size_t delaySamples = this->koeff * sampleRate;
+
+    samples.reserve(reader.getUnitSize());
+    delayedSamples.resize(delaySamples, 0);
+
+    bool hasMoreData = true;
+
+    while (reader.getSamples(samples, this->left, this->right))
+    {
+        for (size_t i = 0; i < samples.size(); ++i)
+        {
+            int16_t original = samples[i];
+            int16_t delayed = delayedSamples[i % delaySamples];
+            int16_t newSample = static_cast<int16_t>(original + this->koeff * delayed);
+
+            samples[i] = max(min(newSample, static_cast<int16_t>(INT16_MAX)), static_cast<int16_t>(INT16_MIN));
+
+            delayedSamples[i % delaySamples] = samples[i];
+        }
+
+        writer.saveSamples(reader, samples, this->left);
+    }
+
+    reader.closeWAVFile();
+    writer.closeWAVFile();
 }
 
 Converter *MuteCreater::creatConverter(u_int32_t left, u_int32_t rigth)
@@ -320,26 +372,6 @@ int main(int argc, char **argv)
 {
     ReadWAV reader;
     WriteWAV writer;
-
-    // reader.openWAVFile("./exp_music/el_guitar_16.wav");
-    // reader.parseHead();
-
-    // cout << reader.checkCorrect()
-    //      << endl;
-
-    // vector<int16_t> samples;
-    // samples.reserve(reader.getUnitSize());
-
-    // writer.openWAVFile("./el_guitar_16_out.wav");
-    // writer.writeHead();
-
-    // while (reader.getSamples(samples, 2, 5))
-    // {
-    //     writer.saveSamples(samples);
-    // }
-
-    // writer.closeWAVFile();
-    // reader.closeWAVFile();
 
     ParseCmdLineArg parserCmdLine(argc, argv);
     string confFileName = parserCmdLine.getConfFileName();

@@ -102,6 +102,7 @@ class Mix : public Converter
 private:
     string nameSrcFile;
     u_int32_t start_with;
+    void avg_samples(vector<int16_t> &, vector<int16_t> &);
 
 public:
     Mix(string, u_int32_t);

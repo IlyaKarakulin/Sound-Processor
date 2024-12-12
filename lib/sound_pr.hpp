@@ -7,6 +7,7 @@
 #include <queue>
 #include <utility>
 #include <filesystem>
+#include <iostream>
 
 using namespace std;
 namespace fs = std::filesystem;
@@ -37,12 +38,12 @@ public:
     virtual bool openWAVFile(string) = 0;
 };
 
-class ReadWAV : public MetaData //!!! delit
+class ReadWAV : public MetaData
 {
 private:
     ifstream file;
     string inputFileName;
-    const int sizeOfUnit = 44100; // 524288; // cout samples
+    const int sizeOfUnit = 44100;
     u_int64_t remainingDataSize;
     struct WAVHeader *header;
 

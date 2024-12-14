@@ -41,7 +41,6 @@
 
 3. **Testing**
 You can enable testing of command line argument parsers and configuration file
-    ``bash
+    ```bash
     cmake -DENABLE_TESTING=<ON/OFF> ..
     ```
-    

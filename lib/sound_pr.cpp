@@ -363,6 +363,10 @@ queue<Converter *> ParseConfigFile::parsing(ParseCmdLineArg &parseArgs)
         {
             // Add mute operation to the queue
             fin >> left >> rigth;
+            if ((left < 0) || (left >= rigth))
+            {
+                throw invalid_argument("Invalid parameters!\n");
+            }
             Mute *mute = (Mute *)muteCreater.creatConverter(left, rigth);
             conv_queue.push(mute);
         }
@@ -371,6 +375,10 @@ queue<Converter *> ParseConfigFile::parsing(ParseCmdLineArg &parseArgs)
             // Add mix operation to the queue
             int with = 0;
             fin >> tmp >> with;
+            if (with < 0)
+            {
+                throw invalid_argument("Invalid parameters!\n");
+            }
             int num_file = 0;
             num_file = stoi(tmp.substr(1));
             Mix *mix = (Mix *)mixCreater.creatConverter(with, parseArgs.getInWAVFileName(num_file));
@@ -381,13 +389,19 @@ queue<Converter *> ParseConfigFile::parsing(ParseCmdLineArg &parseArgs)
             // Add reverberation operation to the queue
             double k = 0.0;
             fin >> left >> rigth >> k;
+
+            if ((left < 0) || (left >= rigth) || (k < 0.0) || (k > 1.0))
+            {
+                throw invalid_argument("Invalid parameters!\n");
+            }
+
             Reverberation *revb = (Reverberation *)revbCreater.creatConverter(left, rigth, k);
             conv_queue.push(revb);
         }
         else
         {
             // Handle unknown commands
-            cerr << "Command was not found!\n";
+            // cerr << "Command was not found!\n";
         }
     }
 

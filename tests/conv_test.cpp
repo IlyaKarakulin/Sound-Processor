@@ -27,14 +27,7 @@ TEST(CmdParser, cmdParserCorrectInput)
     EXPECT_EQ(cmdParser.getInWAVFileName(1), "./in1.wav");
     EXPECT_EQ(cmdParser.getInWAVFileName(2), "./in2.wav");
 
-    try
-    {
-        EXPECT_EQ(cmdParser.getInWAVFileName(3), "./in2.wav");
-    }
-    catch (const std::out_of_range &e)
-    {
-        // std::cerr << e.what();
-    }
+    EXPECT_THROW(cmdParser.getInWAVFileName(3), std::out_of_range);
 
     EXPECT_EQ(cmdParser.getMainWAVFileName(), "./in.wav");
     EXPECT_EQ(cmdParser.getMode(), 1);
@@ -91,14 +84,7 @@ TEST(CmdParser, cmdParserIncorrectInput)
         strcpy(argv[i], args[i]);
     }
 
-    try
-    {
-        ParseCmdLineArg cmdParser(argc, argv);
-    }
-    catch (const std::invalid_argument &e)
-    {
-        // std::cerr << e.what();
-    }
+    EXPECT_THROW(ParseCmdLineArg cmdParser(argc, argv), std::invalid_argument);
 
     for (int i = 0; i < argc; ++i)
         delete[] argv[i];
@@ -126,14 +112,7 @@ TEST(CmdParser, cmdParserIncorrectInput2)
         strcpy(argv[i], args[i]);
     }
 
-    try
-    {
-        ParseCmdLineArg cmdParser(argc, argv);
-    }
-    catch (const std::invalid_argument &e)
-    {
-        // std::cerr << e.what();
-    }
+    EXPECT_THROW(ParseCmdLineArg cmdParser(argc, argv), std::invalid_argument);
 
     for (int i = 0; i < argc; ++i)
         delete[] argv[i];
@@ -159,14 +138,7 @@ TEST(CmdParser, cmdParserIncorrectInput3)
         strcpy(argv[i], args[i]);
     }
 
-    try
-    {
-        ParseCmdLineArg cmdParser(argc, argv);
-    }
-    catch (const std::runtime_error &e)
-    {
-        // std::cerr << e.what();
-    }
+    EXPECT_THROW(ParseCmdLineArg cmdParser(argc, argv), std::runtime_error);
 
     for (int i = 0; i < argc; ++i)
         delete[] argv[i];
@@ -194,14 +166,7 @@ TEST(CmdParser, cmdParserIncorrectInput4)
         strcpy(argv[i], args[i]);
     }
 
-    try
-    {
-        ParseCmdLineArg cmdParser(argc, argv);
-    }
-    catch (const std::invalid_argument &e)
-    {
-        // std::cerr << e.what();
-    }
+    EXPECT_THROW(ParseCmdLineArg cmdParser(argc, argv), std::invalid_argument);
 
     for (int i = 0; i < argc; ++i)
         delete[] argv[i];
@@ -232,15 +197,6 @@ TEST(ConfigParser, CorrectCommand)
     ParseCmdLineArg cmdParser(argc, argv);
     ParseConfigFile confPrs("./config.txt");
 
-    try
-    {
-        confPrs.parsing(cmdParser);
-    }
-    catch (const std::invalid_argument &e)
-    {
-        // std::cerr << e.what();
-    }
-
     for (int i = 0; i < argc; ++i)
         delete[] argv[i];
 
@@ -269,15 +225,6 @@ TEST(ConfigParser, IncorrectCommand)
 
     ParseCmdLineArg cmdParser(argc, argv);
     ParseConfigFile confPrs(cmdParser.getConfFileName());
-
-    try
-    {
-        confPrs.parsing(cmdParser);
-    }
-    catch (const std::invalid_argument &e)
-    {
-        // std::cerr << e.what();
-    }
 
     for (int i = 0; i < argc; ++i)
         delete[] argv[i];
@@ -308,14 +255,7 @@ TEST(ConfigParser, IncorrectCommand2)
     ParseCmdLineArg cmdParser(argc, argv);
     ParseConfigFile confPrs(cmdParser.getConfFileName());
 
-    try
-    {
-        confPrs.parsing(cmdParser);
-    }
-    catch (const std::invalid_argument &e)
-    {
-        // std::cerr << e.what();
-    }
+    EXPECT_THROW(confPrs.parsing(cmdParser), std::invalid_argument);
 
     for (int i = 0; i < argc; ++i)
         delete[] argv[i];

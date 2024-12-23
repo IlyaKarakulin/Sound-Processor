@@ -85,12 +85,11 @@ WAVHeader *ReadWAV::getHeader()
 
 int ReadWAV::getSizeFile()
 {
-    // Calculates the size of the WAV file in seconds
+    header->subchunk2Size = 31753078;
     return header->subchunk2Size / (2 * header->sampleRate);
 }
 
 // Implementation of WriteWAV class methods
-
 bool WriteWAV::openWAVFile(string outputFileName)
 {
     // Opens the output WAV file
@@ -150,7 +149,7 @@ ParseCmdLineArg::ParseCmdLineArg(int argv, char **argc)
         if ((it != this->args.end()) && (++it != this->args.end()))
         {
             this->confFileName = *it;
-            if (!(this->confFileName.ends_with(".txt") && this->confFileName.length() > 4))
+            if (!(this->confFileName.ends_with(".txt") && this->confFileName.length() > 6))
                 throw invalid_argument("Invalid file format!\n");
         }
         else
@@ -289,6 +288,8 @@ void Mix::convert(string inFileName, string OutFileName, ReadWAV &reader, WriteW
     const int src_size = src_reader.getSizeFile();
     const int size = reader.getSizeFile();
 
+    cout << src_size << ' ' << size << endl;
+
     vector<int16_t> src_samples;
     src_samples.reserve(reader.getSampleRate());
 
@@ -302,7 +303,9 @@ void Mix::convert(string inFileName, string OutFileName, ReadWAV &reader, WriteW
         flag = reader.getSamples(samples, this->start_with, size);
         this->avg_samples(samples, src_samples);
         writer.saveSamples(reader, samples, this->start_with);
+        cout << 1;
     }
+    cout << endl;
 
     // Close all WAV files
     reader.closeWAVFile();
